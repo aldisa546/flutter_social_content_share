@@ -176,24 +176,10 @@ public class FlutterSocialContentSharePlugin implements FlutterPlugin, MethodCal
     Intent feedIntent = new Intent(Intent.ACTION_SEND);
     feedIntent.setType("image/*");
     feedIntent.putExtra(Intent.EXTRA_STREAM, backgroundAssetUri);
-    feedIntent.putExtra(Intent.EXTRA_TEXT, quote);
-    feedIntent.setPackage(INSTAGRAM_PACKAGE_NAME);
-
-    //story
-    Intent storiesIntent = new Intent("com.instagram.share.ADD_TO_STORY");
-    storiesIntent.setDataAndType(backgroundAssetUri, "jpg");
-    storiesIntent.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
-    storiesIntent.setPackage(INSTAGRAM_PACKAGE_NAME);
-    storiesIntent.putExtra(Intent.EXTRA_TEXT, quote);
-
-    Intent chooserIntent = Intent.createChooser(feedIntent, "Share via Instagram");
-    chooserIntent.putExtra(Intent.EXTRA_TEXT, quote);
-
-    chooserIntent.putExtra(Intent.EXTRA_INITIAL_INTENTS, new Intent[]{storiesIntent});
 
     try {
       result.success("Success");
-      activity.startActivity(chooserIntent);
+      activity.startActivity(Intent.createChooser(feedIntent, "Share to"));
     } catch (ActivityNotFoundException e) {
       e.printStackTrace();
       result.success("Failure");
