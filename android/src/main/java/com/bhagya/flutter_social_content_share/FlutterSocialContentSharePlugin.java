@@ -114,7 +114,7 @@ public class FlutterSocialContentSharePlugin implements FlutterPlugin, MethodCal
             shareToFacebook(url, quote, result);
             break;
           case "ShareType.instagramWithImageUrl":
-            getImageBitmap(imageUrl, result);
+            getImageBitmap(imageUrl, result, imageName);
             break;
           default:
             result.notImplemented();
@@ -141,13 +141,13 @@ public class FlutterSocialContentSharePlugin implements FlutterPlugin, MethodCal
     }
   }
 
-  private void getPermissionToStoreData(final Result result) {
+  private void getPermissionToStoreData(final Result result, String imgName) {
     Dexter.withContext(activity).withPermission(Manifest.permission.WRITE_EXTERNAL_STORAGE)
             .withListener(new PermissionListener() {
               @Override
               public void onPermissionGranted(PermissionGrantedResponse response) {
                 if (instagramInstalled()) {
-                  shareFileToInstagram(result);
+                  shareFileToInstagram(result, imgName);
                 }else{
                   result.success("Instagram app is not installed on your device");
                 }
@@ -166,8 +166,8 @@ public class FlutterSocialContentSharePlugin implements FlutterPlugin, MethodCal
             }).check();
   }
 
-  private void shareFileToInstagram(Result result) {
-    Uri backgroundAssetUri = getImageUriFromBitmap(result,socialImageBitmap);
+  private void shareFileToInstagram(Result result, String imgName) {
+    Uri backgroundAssetUri = getImageUriFromBitmap(result,socialImageBitmap,imgName);
     if (backgroundAssetUri == null) {
       result.success("Failure");
       return;
@@ -187,18 +187,18 @@ public class FlutterSocialContentSharePlugin implements FlutterPlugin, MethodCal
     }
   }
 
-  private Uri getImageUriFromBitmap(Result result, Bitmap inImage) {
+  private Uri getImageUriFromBitmap(Result result, Bitmap inImage, String imgName) {
     if (inImage == null) {
       result.success("Could not load the image");
       return null;
     }
     ByteArrayOutputStream bytes = new ByteArrayOutputStream();
     inImage.compress(Bitmap.CompressFormat.JPEG, 100, bytes);
-    String path = MediaStore.Images.Media.insertImage(activity.getContentResolver(), inImage,"IMG_" + Calendar.getInstance().getTime(),null);
+    String path = MediaStore.Images.Media.insertImage(activity.getContentResolver(), inImage,"IMG_" + imgName,null);
     return Uri.parse(path);
   }
 
-  private void getImageBitmap(String path, final Result result) {
+  private void getImageBitmap(String path, final Result result, String imgName) {
 
     Glide.with(activity)
             .asBitmap()
@@ -209,7 +209,7 @@ public class FlutterSocialContentSharePlugin implements FlutterPlugin, MethodCal
               @Override
               public void onResourceReady(@NonNull Bitmap resource, @Nullable Transition<? super Bitmap> transition) {
                 socialImageBitmap = resource;
-                getPermissionToStoreData(result);
+                getPermissionToStoreData(result, imgName);
               }
 
               @Override
