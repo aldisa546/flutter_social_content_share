@@ -11,7 +11,6 @@ import android.graphics.drawable.Drawable;
 import android.net.Uri;
 import android.provider.MediaStore;
 
-
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 import androidx.core.content.FileProvider;
@@ -52,9 +51,11 @@ import io.flutter.plugin.common.PluginRegistry.Registrar;
 
 /** FlutterSocialContentSharePlugin */
 public class FlutterSocialContentSharePlugin implements FlutterPlugin, MethodCallHandler, ActivityAware {
-  /// The MethodChannel that will the communication between Flutter and native Android
+  /// The MethodChannel that will the communication between Flutter and native
+  /// Android
   ///
-  /// This local reference serves to register the plugin with the Flutter Engine and unregister it
+  /// This local reference serves to register the plugin with the Flutter Engine
+  /// and unregister it
   /// when the Flutter Engine is detached from the Activity
   private MethodChannel channel;
   private Activity activity;
@@ -76,6 +77,7 @@ public class FlutterSocialContentSharePlugin implements FlutterPlugin, MethodCal
   private ArrayList<String> bccrecipients;
   private String subject;
   private String body;
+  private Uri imageUri;
 
   @Override
   public void onAttachedToEngine(@NonNull FlutterPluginBinding flutterPluginBinding) {
@@ -102,80 +104,79 @@ public class FlutterSocialContentSharePlugin implements FlutterPlugin, MethodCal
   public void onMethodCall(@NonNull MethodCall call, @NonNull Result result) {
     if (call.method.equals("getPlatformVersion")) {
       result.success("Android " + android.os.Build.VERSION.RELEASE);
-    } else if (call.method.equalsIgnoreCase("share")){
-        type = call.argument("type");
-        quote = call.argument("quote");
-        url = call.argument("url");
-        imageUrl = call.argument("imageUrl");
-        imageName = call.argument("imageName");
+    } else if (call.method.equalsIgnoreCase("share")) {
+      type = call.argument("type");
+      quote = call.argument("quote");
+      url = call.argument("url");
+      imageUrl = call.argument("imageUrl");
+      imageName = call.argument("imageName");
+      imageUri = call.argument("imageUri");
 
-        switch (type) {
-          case "ShareType.facebookWithoutImage":
-            shareToFacebook(url, quote, result);
-            break;
-          case "ShareType.instagramWithImageUrl":
-            getImageBitmap(imageUrl, result);
-            break;
-          default:
-            result.notImplemented();
-            break;
-        }
+      switch (type) {
+        case "ShareType.facebookWithoutImage":
+          shareToFacebook(url, quote, result);
+          break;
+        case "ShareType.instagramWithImageUrl":
+          getImageBitmap(imageUrl, result);
+          break;
+        default:
+          result.notImplemented();
+          break;
+      }
     } else if (call.method.equalsIgnoreCase("shareOnWhatsapp")) {
       number = call.argument("number");
       textMsg = call.argument("text");
-      shareWhatsApp(number,textMsg,result);
+      shareWhatsApp(number, textMsg, result);
     }
 
     else if (call.method.equalsIgnoreCase("shareOnSMS")) {
       recipients = call.argument("recipients");
       textMsg = call.argument("text");
-      shareSMS(recipients,textMsg,result);
-    }
-    else if (call.method.equalsIgnoreCase("shareOnEmail")) {
+      shareSMS(recipients, textMsg, result);
+    } else if (call.method.equalsIgnoreCase("shareOnEmail")) {
       recipients = call.argument("recipients");
       ccrecipients = call.argument("ccrecipients");
       bccrecipients = call.argument("bccrecipients");
       body = call.argument("body");
       subject = call.argument("subject");
-      shareEmail(recipients,ccrecipients,bccrecipients,subject,body,result);
+      shareEmail(recipients, ccrecipients, bccrecipients, subject, body, result);
     }
   }
 
   private void getPermissionToStoreData(final Result result) {
     Dexter.withContext(activity).withPermission(Manifest.permission.WRITE_EXTERNAL_STORAGE)
-            .withListener(new PermissionListener() {
-              @Override
-              public void onPermissionGranted(PermissionGrantedResponse response) {
-                if (instagramInstalled()) {
-                  shareFileToInstagram(result);
-                }else{
-                  result.success("Instagram app is not installed on your device");
-                }
+        .withListener(new PermissionListener() {
+          @Override
+          public void onPermissionGranted(PermissionGrantedResponse response) {
+            if (instagramInstalled()) {
+              shareFileToInstagram(result);
+            } else {
+              result.success("Instagram app is not installed on your device");
+            }
 
-              }
+          }
 
-              @Override
-              public void onPermissionDenied(PermissionDeniedResponse response) {
-                result.success("Permission Denied!");
-              }
+          @Override
+          public void onPermissionDenied(PermissionDeniedResponse response) {
+            result.success("Permission Denied!");
+          }
 
-              @Override
-              public void onPermissionRationaleShouldBeShown(PermissionRequest permission, PermissionToken token) {
-                token.continuePermissionRequest();
-              }
-            }).check();
+          @Override
+          public void onPermissionRationaleShouldBeShown(PermissionRequest permission, PermissionToken token) {
+            token.continuePermissionRequest();
+          }
+        }).check();
   }
 
   private void shareFileToInstagram(Result result) {
-    Uri backgroundAssetUri = getImageUriFromBitmap(result,socialImageBitmap);
-    if (backgroundAssetUri == null) {
+    if (imageUri == null) {
       result.success("Failure");
       return;
     }
 
     Intent feedIntent = new Intent(Intent.ACTION_SEND);
     feedIntent.setType("image/*");
-    feedIntent.putExtra(Intent.EXTRA_STREAM, backgroundAssetUri);
+    feedIntent.putExtra(Intent.EXTRA_STREAM, imageUri);
     feedIntent.setPackage("com.instagram.android");
 
     try {
@@ -194,35 +195,36 @@ public class FlutterSocialContentSharePlugin implements FlutterPlugin, MethodCal
     }
     ByteArrayOutputStream bytes = new ByteArrayOutputStream();
     inImage.compress(Bitmap.CompressFormat.JPEG, 100, bytes);
-    String path = MediaStore.Images.Media.insertImage(activity.getContentResolver(), inImage,"IMG_" + imageName,null);
+    String path = MediaStore.Images.Media.insertImage(activity.getContentResolver(), inImage, setFileName(imageUrl),
+        null);
     return Uri.parse(path);
   }
 
   private void getImageBitmap(String path, final Result result) {
 
     Glide.with(activity)
-            .asBitmap()
-            .load(path)
-            .diskCacheStrategy(DiskCacheStrategy.NONE)
-            .skipMemoryCache(true)
-            .into(new CustomTarget<Bitmap>() {
-              @Override
-              public void onResourceReady(@NonNull Bitmap resource, @Nullable Transition<? super Bitmap> transition) {
-                socialImageBitmap = resource;
-                getPermissionToStoreData(result);
-              }
+        .asBitmap()
+        .load(path)
+        .diskCacheStrategy(DiskCacheStrategy.NONE)
+        .skipMemoryCache(true)
+        .into(new CustomTarget<Bitmap>() {
+          @Override
+          public void onResourceReady(@NonNull Bitmap resource, @Nullable Transition<? super Bitmap> transition) {
+            socialImageBitmap = resource;
+            getPermissionToStoreData(result);
+          }
 
-              @Override
-              public void onLoadCleared(@Nullable Drawable placeholder) {
-              }
-            });
+          @Override
+          public void onLoadCleared(@Nullable Drawable placeholder) {
+          }
+        });
   }
 
   /**
    * share to Facebook
    *
    * @param url    String
-   * @param quote    String
+   * @param quote  String
    * @param result Result
    */
   private void shareToFacebook(String url, String quote, Result result) {
@@ -230,9 +232,9 @@ public class FlutterSocialContentSharePlugin implements FlutterPlugin, MethodCal
     ShareDialog shareDialog = new ShareDialog(activity);
 
     ShareLinkContent content = new ShareLinkContent.Builder()
-            .setContentUrl(Uri.parse(url))
-            .setQuote(quote)
-            .build();
+        .setContentUrl(Uri.parse(url))
+        .setQuote(quote)
+        .build();
     if (ShareDialog.canShow(ShareLinkContent.class)) {
       shareDialog.show(content);
       result.success("Success");
@@ -244,10 +246,10 @@ public class FlutterSocialContentSharePlugin implements FlutterPlugin, MethodCal
     try {
       if (activity != null) {
         activity.getPackageManager()
-                .getApplicationInfo(INSTAGRAM_PACKAGE_NAME, 0);
+            .getApplicationInfo(INSTAGRAM_PACKAGE_NAME, 0);
         return true;
       } else {
-        Log.d("App","Instagram app is not installed on your device");
+        Log.d("App", "Instagram app is not installed on your device");
       }
     } catch (PackageManager.NameNotFoundException e) {
       return false;
@@ -255,15 +257,14 @@ public class FlutterSocialContentSharePlugin implements FlutterPlugin, MethodCal
     return false;
   }
 
-
   /**
    * share on Whatsapp
    *
-   * @param number    String
-   * @param text    String
+   * @param number String
+   * @param text   String
    * @param result Result
    */
-  private void shareWhatsApp(String number,String text,Result result) {
+  private void shareWhatsApp(String number, String text, Result result) {
     Intent intent = new Intent(Intent.ACTION_SEND);
     intent.setType("text/plain");
     intent.setPackage("com.whatsapp");
@@ -274,23 +275,23 @@ public class FlutterSocialContentSharePlugin implements FlutterPlugin, MethodCal
       result.success("Whatsapp app is not installed on your device");
     }
   }
+
   /**
    * share on SMS
    *
-   * @param recipients    ArrayList<String>
-   * @param text    String
-   * @param result Result
+   * @param recipients ArrayList<String>
+   * @param text       String
+   * @param result     Result
    */
   private void shareSMS(ArrayList<String> recipients, String text, Result result) {
-    try{
+    try {
       Intent intent = new Intent(Intent.ACTION_VIEW);
       intent.setData(Uri.parse("smsto:"));
       intent.setType("vnd.android-dir/mms-sms");
-      intent.putExtra("address",recipients);
-      intent.putExtra("sms_body",text);
+      intent.putExtra("address", recipients);
+      intent.putExtra("sms_body", text);
       activity.startActivity(Intent.createChooser(intent, "Send sms via:"));
-    }
-    catch(Exception e){
+    } catch (Exception e) {
       result.success("Message service is not available");
     }
   }
@@ -298,17 +299,18 @@ public class FlutterSocialContentSharePlugin implements FlutterPlugin, MethodCal
   /**
    * share on Email
    *
-   * @param recipients ArrayList<String>
-   * @param ccrecipients ArrayList<String>
+   * @param recipients    ArrayList<String>
+   * @param ccrecipients  ArrayList<String>
    * @param bccrecipients ArrayList<String>
-   * @param subject    String
-   * @param body       String
-   * @param result     Result
+   * @param subject       String
+   * @param body          String
+   * @param result        Result
    */
-  private void shareEmail(ArrayList<String> recipients, ArrayList<String> ccrecipients,ArrayList<String> bccrecipients,String subject,String body,Result result){
+  private void shareEmail(ArrayList<String> recipients, ArrayList<String> ccrecipients, ArrayList<String> bccrecipients,
+      String subject, String body, Result result) {
 
     Intent shareIntent = new Intent(Intent.ACTION_SENDTO, Uri.fromParts(
-            "mailto", "", null));
+        "mailto", "", null));
     shareIntent.putExtra(Intent.EXTRA_SUBJECT, subject);
     shareIntent.putExtra(Intent.EXTRA_TEXT, body);
     shareIntent.putExtra(Intent.EXTRA_EMAIL, recipients);
@@ -319,6 +321,12 @@ public class FlutterSocialContentSharePlugin implements FlutterPlugin, MethodCal
     } catch (android.content.ActivityNotFoundException ex) {
       result.success("Mail services are not available");
     }
+  }
+
+  private String setFileName(String name) {
+    int index = name.lastIndexOf('/');
+    String lastString = name.substring(index + 1);
+    return lastString;
   }
 
   @Override
