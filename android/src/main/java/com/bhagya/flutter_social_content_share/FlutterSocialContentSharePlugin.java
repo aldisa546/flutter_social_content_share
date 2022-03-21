@@ -192,10 +192,10 @@ public class FlutterSocialContentSharePlugin implements FlutterPlugin, MethodCal
       result.success("Could not load the image");
       return null;
     }
-    ByteArrayOutputStream bytes = new ByteArrayOutputStream();
-    inImage.compress(Bitmap.CompressFormat.JPEG, 100, bytes);
-    String path = MediaStore.Images.Media.insertImage(activity.getContentResolver(), inImage,"IMG_" + Calendar.getInstance().getTime(),null);
-    return Uri.parse(path);
+    // ByteArrayOutputStream bytes = new ByteArrayOutputStream();
+    // inImage.compress(Bitmap.CompressFormat.JPEG, 100, bytes);
+    // String path = MediaStore.Images.Media.insertImage(activity.getContentResolver(), inImage,"IMG_" + Calendar.getInstance().getTime(),null);
+    return Uri.parse(imageUrl);
   }
 
   private void getImageBitmap(String path, final Result result) {
